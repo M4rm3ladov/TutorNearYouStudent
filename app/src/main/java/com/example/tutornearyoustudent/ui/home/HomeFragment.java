@@ -19,7 +19,10 @@ import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.lifecycle.ViewModelProviders;
 
+import com.example.tutornearyoustudent.CommonClass;
 import com.example.tutornearyoustudent.R;
+import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -35,6 +38,11 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionDeniedResponse;
@@ -42,6 +50,8 @@ import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
 import com.karumi.dexter.listener.single.SnackbarOnDeniedPermissionListener;
+
+import java.util.Objects;
 
 public class HomeFragment extends Fragment implements OnMapReadyCallback {
 
@@ -55,15 +65,39 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     private LocationRequest locationRequest;
     private LocationCallback locationCallback;
 
+    DatabaseReference onlineRef, currentUserRef, studentsLocationRef;
+    GeoFire geoFire;
+    ValueEventListener onlineValueEventListener = new ValueEventListener() {
+        @Override
+        public void onDataChange(@NonNull DataSnapshot snapshot) {
+            if(snapshot.exists())
+                currentUserRef.onDisconnect().removeValue();
+        }
+
+        @Override
+        public void onCancelled(@NonNull DatabaseError error) {
+            Snackbar.make(mapFragment.getView(), error.getMessage(),Snackbar.LENGTH_LONG).show();
+        }
+    };
+
     @Override
     public void onDestroy() {
         fusedLocationProviderClient.removeLocationUpdates(locationCallback);
+        if(FirebaseAuth.getInstance().getCurrentUser() != null){
+            geoFire.removeLocation(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        }
+        onlineRef.removeEventListener(onlineValueEventListener);
         super.onDestroy();
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        registerOnlineSystem();
+    }
+
+    private void registerOnlineSystem() {
+        onlineRef.addValueEventListener(onlineValueEventListener);
     }
 
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -83,6 +117,14 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void init() {
+        onlineRef = FirebaseDatabase.getInstance().getReference().child(".info/connected");
+        studentsLocationRef = FirebaseDatabase.getInstance().getReference(CommonClass.STUDENTS_LOCATION_REFERENCES);
+        currentUserRef = FirebaseDatabase.getInstance().getReference(CommonClass.STUDENTS_LOCATION_REFERENCES)
+                .child(Objects.requireNonNull(FirebaseAuth.getInstance().getCurrentUser()).getUid());
+        geoFire = new GeoFire(studentsLocationRef);
+
+        registerOnlineSystem();
+
         locationRequest = new LocationRequest();
         locationRequest.setSmallestDisplacement(10f);
         locationRequest.setInterval(5000);
@@ -96,6 +138,20 @@ public class HomeFragment extends Fragment implements OnMapReadyCallback {
                 LatLng newPosition = new LatLng(locationResult.getLastLocation().getLatitude(),
                         locationResult.getLastLocation().getLongitude());
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(newPosition, 18f));
+
+                // update location
+                geoFire.setLocation(FirebaseAuth.getInstance().getCurrentUser().getUid(),
+                        new GeoLocation(locationResult.getLastLocation().getLatitude(),
+                                locationResult.getLastLocation().getLongitude()),
+                        new GeoFire.CompletionListener() {
+                            @Override
+                            public void onComplete(String key, DatabaseError error) {
+                                if(error != null)
+                                    Snackbar.make(mapFragment.getView(), error.getMessage(),Snackbar.LENGTH_LONG).show();
+                                else
+                                    Snackbar.make(mapFragment.getView(), "You're Online!",Snackbar.LENGTH_LONG).show();
+                            }
+                        });
             }
         };
 

@@ -9,6 +9,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.example.tutornearyoustudent.Model.StudentInfoModel;
+import com.example.tutornearyoustudent.Utils.UserUtils;
 import com.firebase.ui.auth.AuthMethodPickerLayout;
 import com.firebase.ui.auth.AuthUI;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -20,6 +21,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.iid.FirebaseInstanceId;
+import com.google.firebase.iid.InstanceIdResult;
 
 import java.util.Arrays;
 import java.util.List;
@@ -49,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
                 FirebaseUser firebaseUser = firebaseAuth.getCurrentUser();
                 if (firebaseUser != null) {
                     // update token
-                    /*FirebaseInstanceId.getInstance()
+                    FirebaseInstanceId.getInstance()
                             .getInstanceId()
                             .addOnFailureListener(new OnFailureListener() {
                                 @Override
@@ -63,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
                                     Log.d("TOKEN", instanceIdResult.getToken());
                                     UserUtils.updateToken(MainActivity.this, instanceIdResult.getToken());
                                 }
-                            });*/
+                            });
                     handleInfoRegister();
                 } else {
                     handleLoginRegister();
